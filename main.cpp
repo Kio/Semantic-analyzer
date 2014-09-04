@@ -2,6 +2,11 @@
 #include <fstream>
 #include <string>
 #include <set>
+#include <vector>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 using namespace std;
 
 class Sentence
@@ -50,8 +55,130 @@ class InputFile {
         ifstream file;
 };
 
+enum Tag {
+	NOUN,
+	VERB,
+	PRONOUN,
+	ADJECTIVE,
+	DETERMINER,
+	POSSESSIVE_ENDING,
+	CARDINAL_NUMBER,
+	ADVERB,
+	COORDINATING_CONJUNCTION,
+	TO,
+	IN,
+	PUNCTUATION
+};
+
+class SyntaxInfo {
+	public:
+		string word;
+		string morphological_form_of_word;
+		Tag tag;
+		int link;
+
+		SyntaxInfo(string _word,
+				   string _morphological_form_of_word,
+				   Tag _tag,
+				   int _link) : word(_word),
+								morphological_form_of_word(_morphological_form_of_word),
+								tag(_tag),
+								link(_link) {}
+
+		SyntaxInfo() {}
+};
+
+enum Language
+{
+    RUS,
+    ENG
+};
+
+class Parser {
+    public:
+        Parser(Language _lang) : lang(_lang) {
+
+        }
+
+        /**
+         * Syntax parsing of sentence.
+         *
+         * @param	sentence Sentence to parse.
+         * @return	void
+         */
+        vector<SyntaxInfo>
+        parse(Sentence *sentence) {
+            pid_t pid;
+            if (pid = fork()) { // parrent
+                wait();
+				vector<SyntaxInfo> synt_info;
+				ifstream sem_out("out.txt");
+				string tmp, string_tag;
+				char buff[256];
+				while (!sem_out.eof()) {
+					SyntaxInfo info;
+					sem_out >> tmp
+							>> info.word
+							>> info.morphological_form_of_word
+							>> string_tag
+							>> string_tag
+							>> tmp
+							>> info.link;
+					sem_out.getline(buff, 255); // skip all chars to the end of line
+					switch (string_tag[0]) {
+						case 'N':
+							info.tag = NOUN;
+							break;
+						case 'V':
+						case 'M':
+							info.tag = VERB;
+							break;
+						case 'J':
+							info.tag = ADJECTIVE;
+							break;
+						case 'D':
+							info.tag = DETERMINER;
+							break;
+						case 'P':
+							info.tag = PRONOUN;
+							break;
+						case 'C':
+							info.tag = COORDINATING_CONJUNCTION;
+							break;
+						default:
+							info.tag = PUNCTUATION;
+							break;
+					}
+
+					synt_info.push_back(info);
+				}
+				sem_out.close();
+				return synt_info;
+            } else { // child
+                switch (lang)
+                {
+                	case RUS:
+                        execl("en.sh","en.sh",sentence->text.c_str(),NULL);
+                		break;
+
+                	case ENG:
+                        execl("ru.sh","ru.sh",sentence->text.c_str(),NULL);
+                		break;
+                }
+
+            }
+        }
+    private:
+        Language lang;
+};
+
 int
 main(int argc, char **argv)
 {
+	string text = "I solved the problem with statistics.";
+	Sentence sentence(text);
+	Parser parser(ENG);
+	vector<SyntaxInfo> info = parser.parse(&sentence);
+	cout << info.size();
     return 0;
 }
