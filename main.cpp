@@ -5,7 +5,7 @@
 #include <vector>
 #include <stdlib.h>
 #include <sys/types.h>
-//#include <sys/wait.h>
+#include <sys/wait.h>
 #include <unistd.h>
 using namespace std;
 
@@ -94,9 +94,6 @@ enum Language
     ENG
 };
 
-int fork() {return 1;}
-void wait() {}
-
 class Parser {
     public:
         Parser(Language _lang) : lang(_lang) {
@@ -107,16 +104,16 @@ class Parser {
          * Syntax parsing of sentence.
          *
          * @param	sentence Sentence to parse.
-         * @return	void
+         * @return	Return vector of infos for words in sentence. Each info consists of
+		 *			morphological and syntactic information.
          */
-         //TODO Write true comment for return statement
         vector<SyntaxInfo>
         parse(Sentence *sentence) {
             pid_t pid;
             if (pid = fork()) { // parrent
                 wait();
 				vector<SyntaxInfo> synt_info;
-				ifstream sem_out("./RussianDependencyParser/output.txt");
+				ifstream sem_out("../RussianDependencyParser/output.txt");
 				string tmp, string_tag;
 				char buff[256];
 				while (!sem_out.eof()) {
@@ -179,10 +176,10 @@ class Parser {
 int
 main(int argc, char **argv)
 {
-	string text = "I solved the problem with statistics.";
-	Sentence sentence(text);
-	Parser parser(ENG);
-	vector<SyntaxInfo> info = parser.parse(&sentence);
-	cout << info.size();
+	InputFile in_file("input.txt");
+	Sentence *sentence = in_file.nextSentence();
+	Parser parser(RUS);
+	vector<SyntaxInfo> info = parser.parse(sentence);
+	cout << info.size() << endl << info[1].word;
     return 0;
 }
