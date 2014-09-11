@@ -1,1 +1,2 @@
-../RussianDependencyParser/.launch.sh "@1"
+cd ../RussianDependencyParser
+/.launch.sh "$1"

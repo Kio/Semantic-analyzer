@@ -3,10 +3,14 @@
 #include <string>
 #include <set>
 #include <vector>
+#include <map>
+#include <utility>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <algorithm>
+#include <fstream>
 using namespace std;
 
 class Sentence
@@ -24,7 +28,7 @@ class InputFile {
         }
 
         ~InputFile() {
-            file.close();
+        	file.close();
         }
 
         /**
@@ -34,7 +38,7 @@ class InputFile {
          */
         Sentence *nextSentence() {
             string text = "";
-            char symbol; //TODO Support Unicode symbols
+            char symbol;
             static char _end_characters[] = {'.', '!', '?', ';'};
             static set<char> end_characters(_end_characters,
                                             _end_characters + sizeof(_end_characters));
@@ -70,11 +74,19 @@ enum Tag {
 	PUNCTUATION
 };
 
+enum DependTag
+{
+	SUBJ,
+	PRED,
+	OBJ
+};
+
 class SyntaxInfo {
 	public:
 		string word;
 		string morphological_form_of_word;
 		Tag tag;
+		DependTag dep_tag;
 		int link;
 
 		SyntaxInfo(string _word,
@@ -111,10 +123,10 @@ class Parser {
         parse(Sentence *sentence) {
             pid_t pid;
             if (pid = fork()) { // parrent
-                wait();
+            	wait(NULL);
 				vector<SyntaxInfo> synt_info;
 				ifstream sem_out("../RussianDependencyParser/output.txt");
-				string tmp, string_tag;
+				string tmp, string_tag, dep_tag;
 				char buff[256];
 				while (!sem_out.eof()) {
 					SyntaxInfo info;
@@ -124,7 +136,11 @@ class Parser {
 							>> string_tag
 							>> string_tag
 							>> tmp
-							>> info.link;
+							>> info.link
+							>> dep_tag;
+					transform(info.morphological_form_of_word.begin(),
+							  info.morphological_form_of_word.end(),
+							  info.morphological_form_of_word.begin(), ::tolower);
 					sem_out.getline(buff, 255); // skip all chars to the end of line
 					switch (string_tag[0]) {
 						case 'N':
@@ -150,6 +166,22 @@ class Parser {
 							info.tag = PUNCTUATION;
 							break;
 					}
+					switch (dep_tag[0])
+					{
+						case 's':
+							info.dep_tag = SUBJ;
+							break;
+						case 'p':
+							info.dep_tag = PRED;
+							break;
+						case 'o':
+							info.dep_tag = OBJ;
+							break;
+
+						default:
+							break;
+					}
+
 
 					synt_info.push_back(info);
 				}
@@ -158,12 +190,12 @@ class Parser {
             } else { // child
                 switch (lang)
                 {
-                	case RUS:
-                        execl("en.sh","en.sh",sentence->text.c_str(),NULL);
+                	case ENG:
+                        execlp("./en.sh","en.sh",sentence->text.c_str(),NULL);
                 		break;
 
-                	case ENG:
-                        execl("ru.sh","ru.sh",sentence->text.c_str(),NULL);
+                	case RUS:
+                        execlp("./ru.sh","ru.sh",sentence->text.c_str(),NULL);
                 		break;
                 }
 
@@ -173,13 +205,119 @@ class Parser {
         Language lang;
 };
 
+bool is_number(const std::string& s)
+{
+    std::string::const_iterator it = s.begin();
+    while (it != s.end() && std::isdigit(*it)) ++it;
+    return !s.empty() && it == s.end();
+}
+
+class Dependency {
+	public:
+		static multimap<string, DependTag> match;
+
+		Dependency() {}
+
+		static void
+		config() {
+			match.insert(pair<string, DependTag>("к_доп", OBJ));
+			match.insert(pair<string, DependTag>("п_доп", OBJ));
+			match.insert(pair<string, DependTag>("подл", SUBJ));
+			match.insert(pair<string, DependTag>("с_опр", PRED));
+		}
+};
+multimap<string, DependTag> Dependency::match;
+
+class SemanticInfo {
+	public:
+		map< pair<string, DependTag>, vector<string> > info;
+
+		SemanticInfo() {}
+
+		void
+		load(const char *path) {
+			ifstream file;
+			file.open(path);
+
+			string word, tmp;
+			vector<DependTag> tags;
+			file >> tmp;
+			while (!file.eof()) {
+				if (tmp == "TITLE") {
+					file >> tmp >> word >> tmp;
+					transform(word.begin(), word.end(), word.begin(), ::tolower);
+				} else if (tmp[1] == 'F' && tmp.size() > 2) { // GFN or SFN where N = 1, 2, ... (but not GF or SF)
+					if (tmp[0] == 'G') {
+						tags.clear();
+						file >> tmp >> tmp; // =
+						while (is_number(tmp)) {
+							file >> tmp; // tag
+
+							pair< multimap<string, DependTag>::iterator,
+								  multimap<string, DependTag>::iterator > range = Dependency::match.equal_range(tmp);
+							for (multimap<string, DependTag>::iterator it = range.first; it != range.second; ++it) {
+								tags.push_back(it->second);
+							}
+
+							getline(file, tmp);
+							file >> tmp;
+						}
+					} else if (tmp[0] == 'S') {
+						vector<string> semantic;
+						file >> tmp >> tmp; // =
+						while (is_number(tmp)) {
+							file >> tmp; // semantic info
+							semantic.push_back(tmp);
+							getline(file, tmp);
+							file >> tmp;
+						}
+						for (unsigned int i = 0; i < tags.size(); ++i) {
+							info.insert( pair< pair<string, DependTag>, vector<string> >(pair<string, DependTag>(word, tags[i]), semantic) );
+						}
+					}
+				} else {
+					file >> tmp;
+				}
+			}
+
+            file.close();
+		}
+};
+
 int
 main(int argc, char **argv)
 {
-	InputFile in_file("input.txt");
-	Sentence *sentence = in_file.nextSentence();
+	SemanticInfo semantic_info;
+	semantic_info.load("tests/ru_ross.txt");
+	InputFile in_file("tests/input.txt");
 	Parser parser(RUS);
-	vector<SyntaxInfo> info = parser.parse(sentence);
-	cout << info.size() << endl << info[1].word;
-    return 0;
+	ofstream vocabulary;
+	vocabulary.open("tests/vocabulary.txt");
+	Dependency::config();
+	Sentence *sentence;
+	while (sentence = in_file.nextSentence()) {
+	    vector<SyntaxInfo> info = parser.parse(sentence);
+	    for (unsigned int i = 0; i < info.size(); ++i) {
+			// info[i] - word info;
+			if (info[i].link == 0) continue;
+			info[i].link--;
+			string morf_form_of_link_word = info[ info[i].link ].morphological_form_of_word;
+			map< pair<string, DependTag>, vector<string> >::iterator it;
+			if ((it = semantic_info.info.find(pair<string, DependTag>
+										(morf_form_of_link_word, info[i].dep_tag))) != semantic_info.info.end()) {
+				vocabulary << morf_form_of_link_word
+						   << " : "
+						   << info[i].morphological_form_of_word
+						   << "(";
+				for (unsigned int j = 0; j < it->second.size(); ++j) {
+					if (j > 0) vocabulary << ", ";
+					vocabulary << it->second[j];
+				}
+				vocabulary << ")"
+						   << endl;
+			}
+	    }
+	}
+	vocabulary.close();
+	return 0;
 }

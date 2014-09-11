@@ -2,4 +2,3 @@ bin/
 obj/
 *.depend
 Semantic analyzer*
-RussianDependencyParser/

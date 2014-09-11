@@ -32,9 +32,11 @@
 			<Add option="-Wall" />
 			<Add option="-fexceptions" />
 		</Compiler>
+		<Unit filename=".gitignore" />
 		<Unit filename="README.md" />
 		<Unit filename="TODO.txt" />
 		<Unit filename="main.cpp" />
+		<Unit filename="ru.sh" />
 		<Extensions>
 			<code_completion />
 			<debugger />
