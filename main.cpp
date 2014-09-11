@@ -5,7 +5,7 @@
 #include <vector>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <sys/wait.h>
+//#include <sys/wait.h>
 #include <unistd.h>
 using namespace std;
 
@@ -94,6 +94,9 @@ enum Language
     ENG
 };
 
+int fork() {return 1;}
+void wait() {}
+
 class Parser {
     public:
         Parser(Language _lang) : lang(_lang) {
@@ -106,13 +109,14 @@ class Parser {
          * @param	sentence Sentence to parse.
          * @return	void
          */
+         //TODO Write true comment for return statement
         vector<SyntaxInfo>
         parse(Sentence *sentence) {
             pid_t pid;
             if (pid = fork()) { // parrent
                 wait();
 				vector<SyntaxInfo> synt_info;
-				ifstream sem_out("out.txt");
+				ifstream sem_out("./RussianDependencyParser/output.txt");
 				string tmp, string_tag;
 				char buff[256];
 				while (!sem_out.eof()) {
