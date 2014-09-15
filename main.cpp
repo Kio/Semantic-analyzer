@@ -212,25 +212,72 @@ bool is_number(const std::string& s)
     return !s.empty() && it == s.end();
 }
 
+class Multimap {
+public:
+	Multimap() {}
+
+	void insert(string key, DependTag val) {
+		v.push_back(pair<string, DependTag>(key, val));
+	}
+
+	vector<DependTag> equal_range(string key) {
+		vector<DependTag> tags_v;
+		for (unsigned int i = 0; i < v.size(); ++i) {
+		    if (v[i].first == key) {
+				tags_v.push_back(v[i].second);
+		    }
+		}
+		return tags_v;
+	}
+
+	DependTag operator[] (int index) {
+		return v[index].second;
+	}
+private:
+	vector<pair<string, DependTag> > v;
+};
+
 class Dependency {
 	public:
-		static multimap<string, DependTag> match;
+		static Multimap match;
 
 		Dependency() {}
 
 		static void
 		config() {
-			match.insert(pair<string, DependTag>("к_доп", OBJ));
-			match.insert(pair<string, DependTag>("п_доп", OBJ));
-			match.insert(pair<string, DependTag>("подл", SUBJ));
-			match.insert(pair<string, DependTag>("с_опр", PRED));
+			match.insert("к_доп", OBJ);
+			match.insert("п_доп", OBJ);
+			match.insert("подл", SUBJ);
+			match.insert("с_опр", PRED);
 		}
 };
-multimap<string, DependTag> Dependency::match;
+Multimap Dependency::match;
+
+class Map {
+public:
+	Map() {}
+
+	void insert(pair<string, DependTag> key, vector<string> val) {
+		v.push_back(pair< pair<string, DependTag>, vector<string> >(key, val));
+	}
+
+	int find(pair<string, DependTag> key) {
+		for (unsigned int i = 0; i < v.size(); ++i) {
+			if (v[i].first.first == key.first && v[i].first.second == key.second) return i;
+		}
+		return -1;
+	}
+
+	vector<string> operator[] (int index) {
+		return v[index].second;
+	}
+private:
+	vector< pair<pair<string, DependTag>, vector<string> > > v;
+};
 
 class SemanticInfo {
 	public:
-		map< pair<string, DependTag>, vector<string> > info;
+		Map info;
 
 		SemanticInfo() {}
 
@@ -253,11 +300,7 @@ class SemanticInfo {
 						while (is_number(tmp)) {
 							file >> tmp; // tag
 
-							pair< multimap<string, DependTag>::iterator,
-								  multimap<string, DependTag>::iterator > range = Dependency::match.equal_range(tmp);
-							for (multimap<string, DependTag>::iterator it = range.first; it != range.second; ++it) {
-								tags.push_back(it->second);
-							}
+							tags = Dependency::match.equal_range(tmp);
 
 							getline(file, tmp);
 							file >> tmp;
@@ -272,9 +315,9 @@ class SemanticInfo {
 							file >> tmp;
 						}
 						for (unsigned int i = 0; i < tags.size(); ++i) {
-							info.insert( pair< pair<string, DependTag>, vector<string> >(pair<string, DependTag>(word, tags[i]), semantic) );
+							info.insert(pair<string, DependTag>(word, tags[i]), semantic);
 						}
-					}
+					} else file >> tmp;
 				} else {
 					file >> tmp;
 				}
@@ -302,16 +345,16 @@ main(int argc, char **argv)
 			if (info[i].link == 0) continue;
 			info[i].link--;
 			string morf_form_of_link_word = info[ info[i].link ].morphological_form_of_word;
-			map< pair<string, DependTag>, vector<string> >::iterator it;
+			int it;
 			if ((it = semantic_info.info.find(pair<string, DependTag>
-										(morf_form_of_link_word, info[i].dep_tag))) != semantic_info.info.end()) {
+										(morf_form_of_link_word, info[i].dep_tag))) != -1) {
 				vocabulary << morf_form_of_link_word
 						   << " : "
 						   << info[i].morphological_form_of_word
 						   << "(";
-				for (unsigned int j = 0; j < it->second.size(); ++j) {
+				for (unsigned int j = 0; j < semantic_info.info[it].size(); ++j) {
 					if (j > 0) vocabulary << ", ";
-					vocabulary << it->second[j];
+					vocabulary << semantic_info.info[it][j];
 				}
 				vocabulary << ")"
 						   << endl;

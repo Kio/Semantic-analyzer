@@ -1,2 +1,2 @@
 cd ../RussianDependencyParser
-/.launch.sh "$1"
+./launch.sh "$1"
