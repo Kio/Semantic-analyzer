@@ -147,23 +147,23 @@ class Parser {
 							  info.morphological_form_of_word.begin(), ::tolower);
 					sem_out.getline(buff, 255); // skip all chars to the end of line
 					switch (info.s_tag[0]) {
-						case 'N':
+						case 'n':
 							info.tag = NOUN;
 							break;
-						case 'V':
-						case 'M':
+						case 'v':
+						case 'm':
 							info.tag = VERB;
 							break;
-						case 'J':
+						case 'j':
 							info.tag = ADJECTIVE;
 							break;
-						case 'D':
+						case 'd':
 							info.tag = DETERMINER;
 							break;
-						case 'P':
+						case 'p':
 							info.tag = PRONOUN;
 							break;
-						case 'C':
+						case 'c':
 							info.tag = COORDINATING_CONJUNCTION;
 							break;
 						default:
