@@ -87,6 +87,10 @@ class SyntaxInfo {
 		string morphological_form_of_word;
 		Tag tag;
 		DependTag dep_tag;
+		string s_tag;
+		string s_dep_tag;
+		vector<int> links;
+		vector<string> semantic;
 		int link;
 
 		SyntaxInfo(string _word,
@@ -126,23 +130,23 @@ class Parser {
             	wait(NULL);
 				vector<SyntaxInfo> synt_info;
 				ifstream sem_out("../RussianDependencyParser/output.txt");
-				string tmp, string_tag, dep_tag;
+				string tmp;
 				char buff[256];
 				while (!sem_out.eof()) {
 					SyntaxInfo info;
 					sem_out >> tmp
 							>> info.word
 							>> info.morphological_form_of_word
-							>> string_tag
-							>> string_tag
+							>> info.s_tag
+							>> info.s_tag
 							>> tmp
 							>> info.link
-							>> dep_tag;
+							>> info.s_dep_tag;
 					transform(info.morphological_form_of_word.begin(),
 							  info.morphological_form_of_word.end(),
 							  info.morphological_form_of_word.begin(), ::tolower);
 					sem_out.getline(buff, 255); // skip all chars to the end of line
-					switch (string_tag[0]) {
+					switch (info.s_tag[0]) {
 						case 'N':
 							info.tag = NOUN;
 							break;
@@ -166,7 +170,7 @@ class Parser {
 							info.tag = PUNCTUATION;
 							break;
 					}
-					switch (dep_tag[0])
+					switch (info.s_dep_tag[0])
 					{
 						case 's':
 							info.dep_tag = SUBJ;
@@ -275,6 +279,16 @@ private:
 	vector< pair<pair<string, DependTag>, vector<string> > > v;
 };
 
+vector<pair<string, string> > cat;
+vector<pair<string, string> > sense;
+
+string find_in_v(vector<pair<string, string> > &v, string &str) {
+	for (unsigned int i = 0; i < v.size(); ++i) {
+	    if (v[i].first == str) return v[i].second;
+	}
+	return "";
+}
+
 class SemanticInfo {
 	public:
 		Map info;
@@ -318,6 +332,12 @@ class SemanticInfo {
 							info.insert(pair<string, DependTag>(word, tags[i]), semantic);
 						}
 					} else file >> tmp;
+				} else if(tmp == "SENSE") {
+					file >> tmp >> tmp;
+					sense.push_back(pair<string, string>(word, tmp));
+				} else if(tmp == "CAT") {
+					file >> tmp >> tmp;
+					cat.push_back(pair<string, string>(word, tmp));
 				} else {
 					file >> tmp;
 				}
@@ -330,35 +350,58 @@ class SemanticInfo {
 int
 main(int argc, char **argv)
 {
+	Dependency::config();
 	SemanticInfo semantic_info;
 	semantic_info.load("tests/ru_ross.txt");
 	InputFile in_file("tests/input.txt");
 	Parser parser(RUS);
 	ofstream vocabulary;
 	vocabulary.open("tests/vocabulary.txt");
-	Dependency::config();
 	Sentence *sentence;
+
+	int global_i = 1;
 	while (sentence = in_file.nextSentence()) {
 	    vector<SyntaxInfo> info = parser.parse(sentence);
 	    for (unsigned int i = 0; i < info.size(); ++i) {
 			// info[i] - word info;
 			if (info[i].link == 0) continue;
-			info[i].link--;
-			string morf_form_of_link_word = info[ info[i].link ].morphological_form_of_word;
+			info[ info[i].link-1 ].links.push_back(i + 1);
+			string morf_form_of_link_word = info[ info[i].link-1 ].morphological_form_of_word;
 			int it;
 			if ((it = semantic_info.info.find(pair<string, DependTag>
 										(morf_form_of_link_word, info[i].dep_tag))) != -1) {
-				vocabulary << morf_form_of_link_word
-						   << " : "
-						   << info[i].morphological_form_of_word
-						   << "(";
 				for (unsigned int j = 0; j < semantic_info.info[it].size(); ++j) {
-					if (j > 0) vocabulary << ", ";
-					vocabulary << semantic_info.info[it][j];
+					info[i].semantic.push_back(semantic_info.info[it][j]);
 				}
-				vocabulary << ")"
-						   << endl;
 			}
+	    }
+	    for (unsigned int i = 0; i < info.size(); ++i) {
+			vocabulary << global_i++
+					   << "\t"
+					   << info[i].word
+					   << "\t"
+					   << info[i].morphological_form_of_word
+					   << "\t"
+					   << info[i].s_tag
+					   << "\t"
+					   << info[i].link
+					   << "\t"
+					   << info[i].s_dep_tag
+					   << "\t"
+					   << find_in_v(cat, info[i].morphological_form_of_word)
+					   << "\t";
+			for (unsigned int j = 0; j < info[i].semantic.size(); ++j) {
+				if (j > 0) vocabulary << ",";
+				vocabulary << info[i].semantic[j];
+			}
+			if (info[i].semantic.size() == 0) vocabulary << "NONE";
+			vocabulary << "\t"
+					   << find_in_v(sense, info[i].morphological_form_of_word);
+			for (unsigned int j = 0; j < info[i].links.size(); ++j) {
+				if (j > 0) vocabulary << ",";
+				vocabulary << info[i].links[j];
+			}
+			vocabulary << endl;
 	    }
 	}
 	vocabulary.close();
