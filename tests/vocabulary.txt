@@ -1,8 +1,47 @@
-1	Я	я	NPRO	2	subj	1	STAT,ANIM,ORG	1
-2	строил	строить	VERB	0	pred	1	NONE	11,3,4
-3	дом	дом	NOUN	2	obj	1	THINGN,ABSTR,SOC,GEOGR,ARTEF	1
-4				2			THINGN,ABSTR,SOC,GEOGR,ARTEF	
-5	Я	я	NPRO	2	subj	1	STAT,ANIM,ORG	1
-6	строил	строить	VERB	0	pred	1	NONE	11,3,4
-7	дом	дом	NOUN	2	obj	1	THINGN,ABSTR,SOC,GEOGR,ARTEF	1
-8				2			THINGN,ABSTR,SOC,GEOGR,ARTEF	
+============
+TITLE	=	оно
+SENSE	=	1
+CAT	=	1	npro
+GF1	=	1	amod
+SF1	=	1	ANIM
+	2	THINGN
+	3	SUBST
+	4	FIN
+============
+TITLE	=	друг
+SENSE	=	1
+CAT	=	1	noun
+GF1	=	1	obj
+SF1	=	1	SITUAT
+	2	THINGN
+============
+TITLE	=	у
+SENSE	=	1
+CAT	=	1	prep
+GF1	=	1	obj
+SF1	=	1	SITUAT
+	2	THINGN
+============
+TITLE	=	ближе
+SENSE	=	1
+CAT	=	1	comp
+GF1	=	1	pcomp
+SF1	=	1	NAME
+============
+TITLE	=	к
+SENSE	=	1
+CAT	=	1	prep
+GF1	=	1	mod
+SF1	=	1	NAME
+============
+TITLE	=	ростов
+SENSE	=	1
+CAT	=	1	noun
+GF1	=	1	pred
+SF1	=	1	ANIM
+============
+TITLE	=	его
+SENSE	=	1
+CAT	=	1	adjf
+GF1	=	1	mod
+SF1	=	1	ANIM

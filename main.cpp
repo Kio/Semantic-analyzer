@@ -76,9 +76,13 @@ enum Tag {
 
 enum DependTag
 {
-	SUBJ,
+	AMOD,
+	PCOMP,
 	PRED,
-	OBJ
+	COORD,
+	OBJ,
+	SUBJ,
+	CIRC
 };
 
 class SyntaxInfo {
@@ -176,10 +180,18 @@ class Parser {
 							info.dep_tag = SUBJ;
 							break;
 						case 'p':
-							info.dep_tag = PRED;
+							if (info.s_dep_tag[1] == 'r') info.dep_tag = PRED;
+							if (info.s_dep_tag[1] == 'c') info.dep_tag = PCOMP;
 							break;
 						case 'o':
 							info.dep_tag = OBJ;
+							break;
+						case 'a':
+							if (info.s_dep_tag[1] == 'm' && info.s_dep_tag[2] == 'o') info.dep_tag = AMOD;
+							break;
+						case 'c':
+							if (info.s_dep_tag[1] == 'o' && info.s_dep_tag[2] == 'o') info.dep_tag = COORD;
+							if (info.s_dep_tag[1] == 'i') info.dep_tag = CIRC;
 							break;
 
 						default:
@@ -249,10 +261,36 @@ class Dependency {
 
 		static void
 		config() {
+			match.insert("к_доп", AMOD);
+			match.insert("п_доп", AMOD);
+			match.insert("к_доп", PCOMP);
+			match.insert("п_доп", PCOMP);
+			match.insert("к_доп", PRED);
+			match.insert("п_доп", PRED);
+			match.insert("к_доп", COORD);
+			match.insert("п_доп", COORD);
 			match.insert("к_доп", OBJ);
 			match.insert("п_доп", OBJ);
+
+			match.insert("подл", AMOD);
 			match.insert("подл", SUBJ);
-			match.insert("с_опр", PRED);
+
+			match.insert("прим_опр", AMOD);
+			match.insert("с_опр",    AMOD);
+			match.insert("прим_опр", PCOMP);
+			match.insert("с_опр",    PCOMP);
+			match.insert("прим_опр", CIRC);
+			match.insert("с_опр",    CIRC);
+			match.insert("прим_опр", OBJ);
+			match.insert("с_опр",    OBJ);
+
+			match.insert("amod", AMOD);
+			match.insert("pcomp", PCOMP);
+			match.insert("pred", PRED);
+			match.insert("coord", COORD);
+			match.insert("obj", OBJ);
+			match.insert("subj", SUBJ);
+			match.insert("cir", CIRC);
 		}
 };
 Multimap Dependency::match;
@@ -336,7 +374,7 @@ class SemanticInfo {
 					file >> tmp >> tmp;
 					sense.push_back(pair<string, string>(word, tmp));
 				} else if(tmp == "CAT") {
-					file >> tmp >> tmp;
+					file >> tmp >> tmp >> tmp;
 					cat.push_back(pair<string, string>(word, tmp));
 				} else {
 					file >> tmp;
@@ -355,7 +393,8 @@ main(int argc, char **argv)
 	semantic_info.load("tests/ru_ross.txt");
 	InputFile in_file("tests/input.txt");
 	Parser parser(RUS);
-	ofstream vocabulary;
+	ofstream output, vocabulary;
+	output.open("tests/output.txt");
 	vocabulary.open("tests/vocabulary.txt");
 	Sentence *sentence;
 
@@ -370,13 +409,22 @@ main(int argc, char **argv)
 			int it;
 			if ((it = semantic_info.info.find(pair<string, DependTag>
 										(morf_form_of_link_word, info[i].dep_tag))) != -1) {
+				//add to vocabluary
+				vocabulary << "============" << endl
+						   << "TITLE\t=\t" << info[i].morphological_form_of_word << endl
+						   << "SENSE\t=\t1" << endl
+						   << "CAT\t=\t1\t" << info[i].s_tag << endl
+						   << "GF1\t=\t1\t" << info[ info[i].link-1 ].s_dep_tag << endl;
+
 				for (unsigned int j = 0; j < semantic_info.info[it].size(); ++j) {
 					info[i].semantic.push_back(semantic_info.info[it][j]);
+					if (!j) vocabulary << "SF1\t=";
+					vocabulary << "\t" << (j + 1) << "\t" << semantic_info.info[it][j] << endl;
 				}
 			}
 	    }
 	    for (unsigned int i = 0; i < info.size(); ++i) {
-			vocabulary << global_i++
+			output << global_i++
 					   << "\t"
 					   << info[i].word
 					   << "\t"
@@ -391,19 +439,21 @@ main(int argc, char **argv)
 					   << find_in_v(cat, info[i].morphological_form_of_word)
 					   << "\t";
 			for (unsigned int j = 0; j < info[i].semantic.size(); ++j) {
-				if (j > 0) vocabulary << ",";
-				vocabulary << info[i].semantic[j];
+				if (j > 0) output << ",";
+				output << info[i].semantic[j];
 			}
-			if (info[i].semantic.size() == 0) vocabulary << "NONE";
-			vocabulary << "\t"
-					   << find_in_v(sense, info[i].morphological_form_of_word);
+			if (info[i].semantic.size() == 0) output << "NONE";
+			output << "\t"
+					   << find_in_v(sense, info[i].morphological_form_of_word)
+					   << "\t";
 			for (unsigned int j = 0; j < info[i].links.size(); ++j) {
-				if (j > 0) vocabulary << ",";
-				vocabulary << info[i].links[j];
+				if (j > 0) output << ",";
+				output << info[i].links[j];
 			}
-			vocabulary << endl;
+			output << endl;
 	    }
 	}
 	vocabulary.close();
+	output.close();
 	return 0;
 }
