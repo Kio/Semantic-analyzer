@@ -274,6 +274,7 @@ class Dependency {
 
 			match.insert("подл", AMOD);
 			match.insert("подл", SUBJ);
+			match.insert("подл", PRED);
 
 			match.insert("прим_опр", AMOD);
 			match.insert("с_опр",    AMOD);
@@ -299,8 +300,9 @@ class Map {
 public:
 	Map() {}
 
-	void insert(pair<string, DependTag> key, vector<string> val) {
+	void insert(pair<string, DependTag> key, vector<string> val, string _gf) {
 		v.push_back(pair< pair<string, DependTag>, vector<string> >(key, val));
+		gf.push_back(_gf);
 	}
 
 	int find(pair<string, DependTag> key) {
@@ -310,21 +312,39 @@ public:
 		return -1;
 	}
 
-	vector<string> operator[] (int index) {
+	vector<string>& operator[] (int index) {
 		return v[index].second;
+	}
+
+	string get_gf(int index) {
+		return gf[index];
 	}
 private:
 	vector< pair<pair<string, DependTag>, vector<string> > > v;
+	vector<string> gf;
 };
 
 vector<pair<string, string> > cat;
+vector<pair<string, string> > cat0;
 vector<pair<string, string> > sense;
+vector<pair<string, string> > word_gf;
+vector<pair<string, string> > gf0;
+vector<pair<string, vector<string> > > word_sf;
+vector<pair<string, vector<string> > > sf0;
 
 string find_in_v(vector<pair<string, string> > &v, string &str) {
 	for (unsigned int i = 0; i < v.size(); ++i) {
 	    if (v[i].first == str) return v[i].second;
 	}
 	return "";
+}
+
+vector<string>*
+find_v_in_v(vector<pair<string, vector<string> > > &v, string &str) {
+	for (unsigned int i = 0; i < v.size(); ++i) {
+	    if (v[i].first == str) return &v[i].second;
+	}
+	return NULL;
 }
 
 class SemanticInfo {
@@ -338,23 +358,42 @@ class SemanticInfo {
 			ifstream file;
 			file.open(path);
 
-			string word, tmp;
+			string word, tmp, gf;
 			vector<DependTag> tags;
 			file >> tmp;
 			while (!file.eof()) {
 				if (tmp == "TITLE") {
 					file >> tmp >> word >> tmp;
 					transform(word.begin(), word.end(), word.begin(), ::tolower);
-				} else if (tmp[1] == 'F' && tmp.size() > 2) { // GFN or SFN where N = 1, 2, ... (but not GF or SF)
-					if (tmp[0] == 'G') {
+				} else if (tmp[1] == 'F' && tmp.size() > 2) { // GFN or SFN where N = 0, 1, 2, ... (but not GF or SF)
+					if (tmp[2] == '0') {
+						if (tmp[0] == 'G') { // GF0
+							file >> tmp;
+							getline(file, tmp);
+							gf0.push_back(pair<string, string>(word, tmp));
+							file >> tmp;
+						} else { // SF0
+							vector<string> semantic;
+							file >> tmp >> tmp;
+							while (is_number(tmp)) {
+								file >> tmp; // semantic info
+								semantic.push_back(tmp);
+								getline(file, tmp);
+								file >> tmp;
+								sf0.push_back(pair<string, vector<string> >(word, semantic));
+							}
+						}
+					} else if (tmp[0] == 'G') {
 						tags.clear();
 						file >> tmp >> tmp; // =
 						while (is_number(tmp)) {
 							file >> tmp; // tag
 
 							tags = Dependency::match.equal_range(tmp);
+							gf = tmp;
 
 							getline(file, tmp);
+							gf += tmp;
 							file >> tmp;
 						}
 					} else if (tmp[0] == 'S') {
@@ -367,15 +406,38 @@ class SemanticInfo {
 							file >> tmp;
 						}
 						for (unsigned int i = 0; i < tags.size(); ++i) {
-							info.insert(pair<string, DependTag>(word, tags[i]), semantic);
+							info.insert(pair<string, DependTag>(word, tags[i]), semantic, gf);
 						}
 					} else file >> tmp;
+				} else if (tmp[1] == 'F') { // GF or SF
+					if (tmp[0] == 'G') { // GF
+						file >> tmp;
+						getline(file, tmp);
+						word_gf.push_back(pair<string, string>(word, tmp));
+						file >> tmp;
+					} else { // SF
+						vector<string> semantic;
+						file >> tmp >> tmp;
+						while (is_number(tmp)) {
+							file >> tmp; // semantic info
+							semantic.push_back(tmp);
+							getline(file, tmp);
+							file >> tmp;
+							word_sf.push_back(pair<string, vector<string> >(word, semantic));
+						}
+					}
 				} else if(tmp == "SENSE") {
 					file >> tmp >> tmp;
 					sense.push_back(pair<string, string>(word, tmp));
+					file >> tmp;
 				} else if(tmp == "CAT") {
 					file >> tmp >> tmp >> tmp;
 					cat.push_back(pair<string, string>(word, tmp));
+					file >> tmp;
+				} else if(tmp == "CAT0") {
+					file >> tmp >> tmp >> tmp;
+					cat0.push_back(pair<string, string>(word, tmp));
+					file >> tmp;
 				} else {
 					file >> tmp;
 				}
@@ -385,42 +447,82 @@ class SemanticInfo {
 		}
 };
 
+SemanticInfo semantic_info;
+vector<SyntaxInfo> info;
+ofstream output, vocabulary;
+
+void
+check_word(int from, int to) {
+	string morf_form_of_link_word = info[ to ].morphological_form_of_word;
+	int it;
+	if ((it = semantic_info.info.find(pair<string, DependTag>
+								(morf_form_of_link_word, info[from].dep_tag))) != -1) {
+		//add to vocabluary
+		vocabulary << "============" << endl
+				   << "TITLE\t=\t" << info[from].morphological_form_of_word << endl
+				   << "SENSE\t=\t1" << endl;
+		if (find_in_v(cat0, morf_form_of_link_word) != "") {
+			vocabulary << "CAT\t=\t1\t" << find_in_v(cat0, morf_form_of_link_word) << endl;
+		} else {
+			vocabulary << "CAT\t=\t1\t" << info[from].s_tag << endl;
+		}
+
+		if (find_in_v(gf0, morf_form_of_link_word) != "")
+			vocabulary << "GF\t= " << find_in_v(gf0, morf_form_of_link_word) << endl;
+		if (find_v_in_v(sf0, morf_form_of_link_word)) {
+			vocabulary << "SF\t=";
+			vector<string> *word_sf_arr = find_v_in_v(sf0, morf_form_of_link_word);
+			for (unsigned int sf_i = 1; sf_i <= word_sf_arr->size(); ++sf_i) {
+				vocabulary << "\t" << sf_i << "\t" << (*word_sf_arr)[sf_i - 1] << endl;
+			}
+		}
+
+		vocabulary << "GF1\t=\t1\t" << semantic_info.info.get_gf(it) << endl;
+
+		for (unsigned int j = 0; j < semantic_info.info[it].size(); ++j) {
+			info[from].semantic.push_back(semantic_info.info[it][j]);
+			if (!j) vocabulary << "SF1\t=";
+			vocabulary << "\t" << (j + 1) << "\t" << semantic_info.info[it][j] << endl;
+		}
+
+		if (find_in_v(cat, morf_form_of_link_word) != "")
+			vocabulary << "CAT0\t=\t1\t" << find_in_v(cat, morf_form_of_link_word) << endl;
+		if (find_in_v(word_gf, morf_form_of_link_word) != "")
+			vocabulary << "GF0\t=\t" << find_in_v(word_gf, morf_form_of_link_word) << endl;
+		if (find_v_in_v(word_sf, morf_form_of_link_word)) {
+			vocabulary << "SF0\t=";
+			vector<string> *word_sf_arr = find_v_in_v(word_sf, morf_form_of_link_word);
+			for (unsigned int sf_i = 1; sf_i <= word_sf_arr->size(); ++sf_i) {
+				vocabulary << "\t" << sf_i << "\t" << (*word_sf_arr)[sf_i - 1] << endl;
+			}
+		}
+	}
+}
+
 int
 main(int argc, char **argv)
 {
 	Dependency::config();
-	SemanticInfo semantic_info;
 	semantic_info.load("tests/ru_ross.txt");
 	InputFile in_file("tests/input.txt");
 	Parser parser(RUS);
-	ofstream output, vocabulary;
 	output.open("tests/output.txt");
 	vocabulary.open("tests/vocabulary.txt");
 	Sentence *sentence;
 
 	int global_i = 1;
 	while (sentence = in_file.nextSentence()) {
-	    vector<SyntaxInfo> info = parser.parse(sentence);
+	    info = parser.parse(sentence);
 	    for (unsigned int i = 0; i < info.size(); ++i) {
 			// info[i] - word info;
 			if (info[i].link == 0) continue;
 			info[ info[i].link-1 ].links.push_back(i + 1);
-			string morf_form_of_link_word = info[ info[i].link-1 ].morphological_form_of_word;
-			int it;
-			if ((it = semantic_info.info.find(pair<string, DependTag>
-										(morf_form_of_link_word, info[i].dep_tag))) != -1) {
-				//add to vocabluary
-				vocabulary << "============" << endl
-						   << "TITLE\t=\t" << info[i].morphological_form_of_word << endl
-						   << "SENSE\t=\t1" << endl
-						   << "CAT\t=\t1\t" << info[i].s_tag << endl
-						   << "GF1\t=\t1\t" << info[ info[i].link-1 ].s_dep_tag << endl;
-
-				for (unsigned int j = 0; j < semantic_info.info[it].size(); ++j) {
-					info[i].semantic.push_back(semantic_info.info[it][j]);
-					if (!j) vocabulary << "SF1\t=";
-					vocabulary << "\t" << (j + 1) << "\t" << semantic_info.info[it][j] << endl;
-				}
+			check_word(i, info[i].link-1);
+	    }
+	    for (unsigned int i = 0; i < info.size(); ++i) {
+			if (info[i].links.size() == 0) continue;
+			for (unsigned int j = 0; j < info[i].links.size(); ++j) {
+				check_word(i, info[i].links[j] - 1);
 			}
 	    }
 	    for (unsigned int i = 0; i < info.size(); ++i) {
