@@ -525,8 +525,8 @@ main(int argc, char **argv)
 				check_word(i, info[i].links[j] - 1);
 			}
 	    }
-	    for (unsigned int i = 0; i < info.size(); ++i) {
-			output << global_i++
+	    for (unsigned int i = 0; i < info.size()-1; ++i) {
+			output << (i+1)
 					   << "\t"
 					   << info[i].word
 					   << "\t"
@@ -544,7 +544,17 @@ main(int argc, char **argv)
 				if (j > 0) output << ",";
 				output << info[i].semantic[j];
 			}
-			if (info[i].semantic.size() == 0) output << "NONE";
+			if (info[i].semantic.size() == 0) {
+				vector<string>* v = find_v_in_v(word_sf, info[i].morphological_form_of_word);
+				if (v) {
+					output << (*v)[0];
+					for (unsigned int _i = 1; _i < v->size(); ++_i) {
+						output << "," << (*v)[_i];
+					}
+				} else {
+					output << "NONE";
+				}
+			}
 			output << "\t"
 					   << find_in_v(sense, info[i].morphological_form_of_word)
 					   << "\t";
