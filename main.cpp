@@ -275,6 +275,7 @@ class Dependency {
 			match.insert("подл", AMOD);
 			match.insert("подл", SUBJ);
 			match.insert("подл", PRED);
+			match.insert("подл", OBJ);
 
 			match.insert("прим_опр", AMOD);
 			match.insert("с_опр",    AMOD);
@@ -493,6 +494,7 @@ check_word(int from, int to) {
 			vocabulary << "SF0\t=";
 			vector<string> *word_sf_arr = find_v_in_v(word_sf, morf_form_of_link_word);
 			for (unsigned int sf_i = 1; sf_i <= word_sf_arr->size(); ++sf_i) {
+				info[to].semantic.push_back((*word_sf_arr)[sf_i - 1]);
 				vocabulary << "\t" << sf_i << "\t" << (*word_sf_arr)[sf_i - 1] << endl;
 			}
 		}
