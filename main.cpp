@@ -453,7 +453,7 @@ vector<SyntaxInfo> info;
 ofstream output, vocabulary;
 
 void
-check_word(int from, int to) {
+check_word(int from, int to, Sentence *sentence) {
 	string morf_form_of_link_word = info[ to ].morphological_form_of_word;
 	int it;
 	if ((it = semantic_info.info.find(pair<string, DependTag>
@@ -498,6 +498,7 @@ check_word(int from, int to) {
 				vocabulary << "\t" << sf_i << "\t" << (*word_sf_arr)[sf_i - 1] << endl;
 			}
 		}
+		vocabulary << "EXM\t=\t" << sentence->text;
 	}
 }
 
@@ -519,12 +520,12 @@ main(int argc, char **argv)
 			// info[i] - word info;
 			if (info[i].link == 0) continue;
 			info[ info[i].link-1 ].links.push_back(i + 1);
-			check_word(i, info[i].link-1);
+			check_word(i, info[i].link-1, sentence);
 	    }
 	    for (unsigned int i = 0; i < info.size(); ++i) {
 			if (info[i].links.size() == 0) continue;
 			for (unsigned int j = 0; j < info[i].links.size(); ++j) {
-				check_word(i, info[i].links[j] - 1);
+				check_word(i, info[i].links[j] - 1, sentence);
 			}
 	    }
 	    for (unsigned int i = 0; i < info.size()-1; ++i) {
@@ -554,7 +555,7 @@ main(int argc, char **argv)
 						output << "," << (*v)[_i];
 					}
 				} else {
-					output << "NONE";
+					output << "";
 				}
 			}
 			output << "\t"
@@ -566,6 +567,7 @@ main(int argc, char **argv)
 			}
 			output << endl;
 	    }
+	    output << endl;
 	}
 	vocabulary.close();
 	output.close();
