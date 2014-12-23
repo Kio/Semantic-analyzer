@@ -473,31 +473,32 @@ check_word(int from, int to, Sentence *sentence) {
 			vocabulary << "SF\t=";
 			vector<string> *word_sf_arr = find_v_in_v(sf0, morf_form_of_link_word);
 			for (unsigned int sf_i = 1; sf_i <= word_sf_arr->size(); ++sf_i) {
-				vocabulary << "\t  " << sf_i << "  " << (*word_sf_arr)[sf_i - 1] << endl;
+				vocabulary << " " << sf_i << "  " << (*word_sf_arr)[sf_i - 1] << endl;
 			}
 		}
 
-		vocabulary << "GF1\t=\t1  " << semantic_info.info.get_gf(it) << endl;
+		vocabulary << "GF1\t= 1  " << semantic_info.info.get_gf(it) << endl;
 
 		for (unsigned int j = 0; j < semantic_info.info[it].size(); ++j) {
 			info[from].semantic.push_back(semantic_info.info[it][j]);
 			if (!j) vocabulary << "SF1\t=";
-			vocabulary << "\t  " << (j + 1) << "  " << semantic_info.info[it][j] << endl;
+			else vocabulary << "   \t ";
+			vocabulary << " " << (j + 1) << "  " << semantic_info.info[it][j] << endl;
 		}
 
 		if (find_in_v(cat, morf_form_of_link_word) != "")
-			vocabulary << "CAT0\t=\t1  " << find_in_v(cat, morf_form_of_link_word) << endl;
+			vocabulary << "CAT0\t= 1  " << find_in_v(cat, morf_form_of_link_word) << endl;
 		if (find_in_v(word_gf, morf_form_of_link_word) != "")
-			vocabulary << "GF0\t= " << find_in_v(word_gf, morf_form_of_link_word) << endl;
+			vocabulary << "GF0\t=" << find_in_v(word_gf, morf_form_of_link_word) << endl;
 		if (find_v_in_v(word_sf, morf_form_of_link_word)) {
 			vocabulary << "SF0\t=";
 			vector<string> *word_sf_arr = find_v_in_v(word_sf, morf_form_of_link_word);
 			for (unsigned int sf_i = 1; sf_i <= word_sf_arr->size(); ++sf_i) {
 				info[to].semantic.push_back((*word_sf_arr)[sf_i - 1]);
-				vocabulary << "\t  " << sf_i << "  " << (*word_sf_arr)[sf_i - 1] << endl;
+				vocabulary << " " << sf_i << " " << (*word_sf_arr)[sf_i - 1] << endl;
 			}
 		}
-		vocabulary << "EXM\t=  " << sentence->text;
+		vocabulary << "EXM\t=" << sentence->text << endl;
 	}
 }
 
