@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <algorithm>
 #include <fstream>
+#include <cctype>
 using namespace std;
 
 class Sentence
@@ -457,6 +458,7 @@ check_word(int from, int to, Sentence *sentence) {
 	int it;
 	if ((it = semantic_info.info.find(pair<string, DependTag>
 								(morf_form_of_link_word, info[from].dep_tag))) != -1) {
+		info[ info[from].link-1 ].links.push_back(from + 1);
 		//add to vocabluary
 		vocabulary << "============" << endl
 				   << "TITLE\t= " << info[from].morphological_form_of_word << endl
@@ -480,7 +482,7 @@ check_word(int from, int to, Sentence *sentence) {
 		vocabulary << "GF1\t= 1  " << semantic_info.info.get_gf(it) << endl;
 
 		for (unsigned int j = 0; j < semantic_info.info[it].size(); ++j) {
-			info[from].semantic.push_back(semantic_info.info[it][j]);
+			info[to].semantic.push_back(semantic_info.info[it][j]);
 			if (!j) vocabulary << "SF1\t=";
 			else vocabulary << "   \t ";
 			vocabulary << " " << (j + 1) << "  " << semantic_info.info[it][j] << endl;
@@ -488,17 +490,47 @@ check_word(int from, int to, Sentence *sentence) {
 
 		if (find_in_v(cat, morf_form_of_link_word) != "")
 			vocabulary << "CAT0\t= 1  " << find_in_v(cat, morf_form_of_link_word) << endl;
+
+		string suffics = "0";
+		if (info[from].tag == VERB) {
+			suffics = "";
+		}
+
 		if (find_in_v(word_gf, morf_form_of_link_word) != "")
-			vocabulary << "GF0\t=" << find_in_v(word_gf, morf_form_of_link_word) << endl;
+			vocabulary << "GF" << suffics << "\t=" << find_in_v(word_gf, morf_form_of_link_word) << endl;
 		if (find_v_in_v(word_sf, morf_form_of_link_word)) {
-			vocabulary << "SF0\t=";
+			vocabulary << "SF" << suffics << "\t=";
 			vector<string> *word_sf_arr = find_v_in_v(word_sf, morf_form_of_link_word);
 			for (unsigned int sf_i = 1; sf_i <= word_sf_arr->size(); ++sf_i) {
-				info[to].semantic.push_back((*word_sf_arr)[sf_i - 1]);
-				vocabulary << " " << sf_i << " " << (*word_sf_arr)[sf_i - 1] << endl;
+				info[from].semantic.push_back((*word_sf_arr)[sf_i - 1]);
+				vocabulary << " " << sf_i << "  " << (*word_sf_arr)[sf_i - 1] << endl;
 			}
 		}
-		vocabulary << "EXM\t=" << sentence->text << endl;
+		while (isspace(sentence->text[0])) {
+			sentence->text.erase(sentence->text.begin());
+		}
+		vocabulary << "EXM\t= " << sentence->text << endl;
+	}
+}
+
+void
+make_unique(vector<string>* v) {
+	vector<string> *new_v = new vector<string>;
+	bool unique;
+	for (size_t i = 0; i < v->size(); ++i) {
+		unique = true;
+		for (size_t j = 0; j < i; ++j) {
+			if ((*v)[i] == (*v)[j]) {
+				(*v)[i] = "";
+				break;
+			}
+		}
+	}
+	for (size_t i = 0; i < v->size(); ++i) {
+		if ((*v)[i] == "") {
+			v->erase(v->begin() + i);
+			--i;
+		}
 	}
 }
 
@@ -519,7 +551,6 @@ main(int argc, char **argv)
 	    for (unsigned int i = 0; i < info.size(); ++i) {
 			// info[i] - word info;
 			if (info[i].link == 0) continue;
-			info[ info[i].link-1 ].links.push_back(i + 1);
 			check_word(i, info[i].link-1, sentence);
 	    }
 	    for (unsigned int i = 0; i < info.size(); ++i) {
@@ -543,19 +574,23 @@ main(int argc, char **argv)
 					   << "\t"
 					   << find_in_v(cat, info[i].morphological_form_of_word)
 					   << "\t";
-			for (unsigned int j = 0; j < info[i].semantic.size(); ++j) {
-				if (j > 0) output << ",";
-				output << info[i].semantic[j];
-			}
 			if (info[i].semantic.size() == 0) {
 				vector<string>* v = find_v_in_v(word_sf, info[i].morphological_form_of_word);
 				if (v) {
+					make_unique(v);
 					output << (*v)[0];
 					for (unsigned int _i = 1; _i < v->size(); ++_i) {
 						output << "," << (*v)[_i];
 					}
 				} else {
 					output << "";
+				}
+			} else {
+				vector<string>* v = &info[i].semantic;
+				make_unique(v);
+				for (unsigned int j = 0; j < info[i].semantic.size(); ++j) {
+					if (j > 0) output << ",";
+					output << info[i].semantic[j];
 				}
 			}
 			output << "\t"
