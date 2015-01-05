@@ -83,8 +83,30 @@ enum DependTag
 	COORD,
 	OBJ,
 	SUBJ,
-	CIRC
+	CIRC,
+	PUNCT
 };
+
+DependTag
+dep_tag_from_str(string str) {
+	switch (str[0])
+	{
+		case 's':
+			return SUBJ;
+		case 'p':
+			if (str[1] == 'r') return PRED;
+			if (str[1] == 'c') return PCOMP;
+		case 'o':
+			return OBJ;
+		case 'a':
+			if (str[1] == 'm' && str[2] == 'o') return AMOD;
+		case 'c':
+			if (str[1] == 'o' && str[2] == 'o') return COORD;
+			if (str[1] == 'i') return CIRC;
+		default:
+			return PUNCT;
+	}
+}
 
 class SyntaxInfo {
 	public:
@@ -175,30 +197,7 @@ class Parser {
 							info.tag = PUNCTUATION;
 							break;
 					}
-					switch (info.s_dep_tag[0])
-					{
-						case 's':
-							info.dep_tag = SUBJ;
-							break;
-						case 'p':
-							if (info.s_dep_tag[1] == 'r') info.dep_tag = PRED;
-							if (info.s_dep_tag[1] == 'c') info.dep_tag = PCOMP;
-							break;
-						case 'o':
-							info.dep_tag = OBJ;
-							break;
-						case 'a':
-							if (info.s_dep_tag[1] == 'm' && info.s_dep_tag[2] == 'o') info.dep_tag = AMOD;
-							break;
-						case 'c':
-							if (info.s_dep_tag[1] == 'o' && info.s_dep_tag[2] == 'o') info.dep_tag = COORD;
-							if (info.s_dep_tag[1] == 'i') info.dep_tag = CIRC;
-							break;
-
-						default:
-							break;
-					}
-
+					info.dep_tag = dep_tag_from_str(info.s_dep_tag);
 
 					synt_info.push_back(info);
 				}
@@ -262,38 +261,17 @@ class Dependency {
 
 		static void
 		config() {
-			match.insert("к_доп", AMOD);
-			match.insert("п_доп", AMOD);
-			match.insert("к_доп", PCOMP);
-			match.insert("п_доп", PCOMP);
-			match.insert("к_доп", PRED);
-			match.insert("п_доп", PRED);
-			match.insert("к_доп", COORD);
-			match.insert("п_доп", COORD);
-			match.insert("к_доп", OBJ);
-			match.insert("п_доп", OBJ);
-
-			match.insert("подл", AMOD);
-			match.insert("подл", SUBJ);
-			match.insert("подл", PRED);
-			match.insert("подл", OBJ);
-
-			match.insert("прим_опр", AMOD);
-			match.insert("с_опр",    AMOD);
-			match.insert("прим_опр", PCOMP);
-			match.insert("с_опр",    PCOMP);
-			match.insert("прим_опр", CIRC);
-			match.insert("с_опр",    CIRC);
-			match.insert("прим_опр", OBJ);
-			match.insert("с_опр",    OBJ);
-
-			match.insert("amod", AMOD);
-			match.insert("pcomp", PCOMP);
-			match.insert("pred", PRED);
-			match.insert("coord", COORD);
-			match.insert("obj", OBJ);
-			match.insert("subj", SUBJ);
-			match.insert("cir", CIRC);
+			//TODO
+			string ru, eng, tmp;
+			ifstream file;
+			file.open("config.txt");
+			while (!file.eof()) {
+				file >> eng >> tmp >> ru;
+				if (ru != "" && eng != "") {
+					match.insert(ru, dep_tag_from_str(eng));
+				}
+			}
+			file.close();
 		}
 };
 Multimap Dependency::match;
