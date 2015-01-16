@@ -4,7 +4,9 @@
 2. Необходимо установить [RussianDependencyParser](https://github.com/maslenni/RussianDependencyParser) (если он уже был установлен, можно сделать символическую ссылку).
 3. В соседнюю директорию установите Semantic analyzer (необходимо, чтобы обе программы были расположены в одной папке).
 4. Скопируйте файлы из папки Semantic analyzer/RussianDependencyParser в папку с RussianDependencyParser и замените в файле launch.sh путь к TurboParser.
-5. Скомпилируйте Semantic analyzer:
+5. Добавит права на исполнение скриптов ru.sh и ../RussianDependencyParser/launch.sh (chmod +x file.sh)
+6. Скомпилируйте Semantic analyzer:
+
 ```
 #!shell
 
