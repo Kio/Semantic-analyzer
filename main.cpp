@@ -143,6 +143,26 @@ class Parser {
 
         }
 
+        void 
+        make_request(char *cmd, char *sentence) {
+        	pid_t pid;
+            if (pid = fork()) {
+            	wait(NULL);
+            } else {
+                execlp("./ru.sh","ru.sh",cmd,sentence,NULL);
+            }
+        }
+
+        void 
+        init() {
+        	make_request("start", "");
+        }
+
+        void 
+        add_sentence(Sentence *sentence) {
+        	make_request("add", sentence->text.c_str());
+        }
+
         /**
          * Syntax parsing of sentence.
          *
@@ -150,72 +170,57 @@ class Parser {
          * @return	Return vector of infos for words in sentence. Each info consists of
 		 *			morphological and syntactic information.
          */
-        vector<SyntaxInfo>
+        vector< vector<SyntaxInfo> >
         parse(Sentence *sentence) {
-            pid_t pid;
-            if (pid = fork()) { // parrent
-            	wait(NULL);
-				vector<SyntaxInfo> synt_info;
-				ifstream sem_out("../RussianDependencyParser/output.txt");
-				string tmp;
-				char buff[256];
-				while (!sem_out.eof()) {
-					SyntaxInfo info;
-					sem_out >> tmp
-							>> info.word
-							>> info.morphological_form_of_word
-							>> info.s_tag
-							>> info.s_tag
-							>> tmp
-							>> info.link
-							>> info.s_dep_tag;
-					transform(info.morphological_form_of_word.begin(),
-							  info.morphological_form_of_word.end(),
-							  info.morphological_form_of_word.begin(), ::tolower);
-					sem_out.getline(buff, 255); // skip all chars to the end of line
-					switch (info.s_tag[0]) {
-						case 'n':
-							info.tag = NOUN;
-							break;
-						case 'v':
-						case 'm':
-							info.tag = VERB;
-							break;
-						case 'j':
-							info.tag = ADJECTIVE;
-							break;
-						case 'd':
-							info.tag = DETERMINER;
-							break;
-						case 'p':
-							info.tag = PRONOUN;
-							break;
-						case 'c':
-							info.tag = COORDINATING_CONJUNCTION;
-							break;
-						default:
-							info.tag = PUNCTUATION;
-							break;
-					}
-					info.dep_tag = dep_tag_from_str(info.s_dep_tag);
-
-					synt_info.push_back(info);
+            make_request("end", "");
+			ifstream sem_out("../RussianDependencyParser/output.txt");
+			vector< vector<SyntaxInfo> > infos;
+			string tmp;
+			char buff[1024];
+			while (!sem_out.eof()) {
+				SyntaxInfo info;
+				sem_out >> tmp
+						>> info.word
+						>> info.morphological_form_of_word
+						>> info.s_tag
+						>> info.s_tag
+						>> tmp
+						>> info.link
+						>> info.s_dep_tag;
+				transform(info.morphological_form_of_word.begin(),
+						  info.morphological_form_of_word.end(),
+						  info.morphological_form_of_word.begin(), ::tolower);
+				sem_out.getline(buff, 255); // skip all chars to the end of line
+				switch (info.s_tag[0]) {
+					case 'n':
+						info.tag = NOUN;
+						break;
+					case 'v':
+					case 'm':
+						info.tag = VERB;
+						break;
+					case 'j':
+						info.tag = ADJECTIVE;
+						break;
+					case 'd':
+						info.tag = DETERMINER;
+						break;
+					case 'p':
+						info.tag = PRONOUN;
+						break;
+					case 'c':
+						info.tag = COORDINATING_CONJUNCTION;
+						break;
+					default:
+						info.tag = PUNCTUATION;
+						break;
 				}
-				sem_out.close();
-				return synt_info;
-            } else { // child
-                switch (lang)
-                {
-                	case ENG:
-                        execlp("./en.sh","en.sh",sentence->text.c_str(),NULL);
-                		break;
+				info.dep_tag = dep_tag_from_str(info.s_dep_tag);
 
-                	case RUS:
-                        execlp("./ru.sh","ru.sh",sentence->text.c_str(),NULL);
-                		break;
-                }
-
-            }
+				synt_info.push_back(info);
+			}
+			sem_out.close();
+			return synt_info;
         }
     private:
         Language lang;
@@ -522,12 +527,17 @@ main(int argc, char **argv)
 	output.open("tests/output.txt");
 	vocabulary.open("tests/vocabulary.txt");
 	Sentence *sentence;
+	
+	parser.init();
+	while (sentence = in_file.nextSentence()) {
+	    parser.add_sentence(sentence);
+	}
+	vector< vector<SyntaxInfo> > infos = parser.parse();
 
 	int global_i = 1;
-	while (sentence = in_file.nextSentence()) {
-	    info = parser.parse(sentence);
+	for (int sent_id=0; sent_id < infos.size(); ++sent_id) {
+		info = infos[sent_id];
 	    for (unsigned int i = 0; i < info.size(); ++i) {
-			// info[i] - word info;
 			if (info[i].link == 0) continue;
 			check_word(i, info[i].link-1, sentence);
 	    }
