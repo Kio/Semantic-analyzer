@@ -3,7 +3,8 @@ from __future__ import print_function
 import sys
 
 cmd = str(sys.argv[1])
-f = open('testSentence.xml', 'w')
+
+f = open('testSentence.xml', 'w' if cmd == 'start' else 'a')
 
 if (cmd == 'start'):
 	print ('<?xml version="1.0" encoding="utf-8" standalone="yes"?>', file=f)

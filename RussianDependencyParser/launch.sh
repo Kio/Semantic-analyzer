@@ -1,5 +1,5 @@
 python generateSentence.py "$1" "$2"
-if "$2" == "end" 
+if [ "$1" == 'end' ]
 then
 	make
 	SESSION_MANAGER=''

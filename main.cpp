@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <set>
 #include <vector>
@@ -25,7 +26,7 @@ class Sentence
 class InputFile {
     public:
         InputFile(const char *path) {
-            file.open(path);
+		file.open(path);
         }
 
         ~InputFile() {
@@ -56,8 +57,16 @@ class InputFile {
             }
             return NULL;
         }
+
+        void
+        reopen(const char *path) {
+		file.close();
+		file.clear();
+		file.open(path);
+        }
     private:
         ifstream file;
+	char *file_path;
 };
 
 enum Tag {
@@ -131,20 +140,12 @@ class SyntaxInfo {
 		SyntaxInfo() {}
 };
 
-enum Language
-{
-    RUS,
-    ENG
-};
-
 class Parser {
     public:
-        Parser(Language _lang) : lang(_lang) {
-
-        }
+        Parser() {}
 
         void 
-        make_request(char *cmd, char *sentence) {
+        make_request(const char *cmd, const char *sentence) {
         	pid_t pid;
             if (pid = fork()) {
             	wait(NULL);
@@ -163,67 +164,60 @@ class Parser {
         	make_request("add", sentence->text.c_str());
         }
 
-        /**
-         * Syntax parsing of sentence.
-         *
-         * @param	sentence Sentence to parse.
-         * @return	Return vector of infos for words in sentence. Each info consists of
-		 *			morphological and syntactic information.
-         */
-        vector< vector<SyntaxInfo> >
-        parse(Sentence *sentence) {
-            make_request("end", "");
+		vector< vector<SyntaxInfo> >
+		parse() {
+			make_request("end", "");
 			ifstream sem_out("../RussianDependencyParser/output.txt");
 			vector< vector<SyntaxInfo> > infos;
-			string tmp;
-			char buff[1024];
-			while (!sem_out.eof()) {
-				SyntaxInfo info;
-				sem_out >> tmp
-						>> info.word
-						>> info.morphological_form_of_word
-						>> info.s_tag
-						>> info.s_tag
-						>> tmp
-						>> info.link
-						>> info.s_dep_tag;
-				transform(info.morphological_form_of_word.begin(),
-						  info.morphological_form_of_word.end(),
-						  info.morphological_form_of_word.begin(), ::tolower);
-				sem_out.getline(buff, 255); // skip all chars to the end of line
-				switch (info.s_tag[0]) {
-					case 'n':
-						info.tag = NOUN;
-						break;
-					case 'v':
-					case 'm':
-						info.tag = VERB;
-						break;
-					case 'j':
-						info.tag = ADJECTIVE;
-						break;
-					case 'd':
-						info.tag = DETERMINER;
-						break;
-					case 'p':
-						info.tag = PRONOUN;
-						break;
-					case 'c':
-						info.tag = COORDINATING_CONJUNCTION;
-						break;
-					default:
-						info.tag = PUNCTUATION;
-						break;
-				}
-				info.dep_tag = dep_tag_from_str(info.s_dep_tag);
+			string buff, tmp;
+			while (!sem_out.eof()) { // for sentences
+				vector<SyntaxInfo> synt_info;
+				while (!sem_out.eof() && getline(sem_out, buff) && buff.size() > 0) { // for word
+					SyntaxInfo info;
 
-				synt_info.push_back(info);
+					istringstream buff_ss(buff);
+					buff_ss >> tmp
+					        >> info.word
+					        >> info.morphological_form_of_word
+					        >> info.s_tag
+					        >> info.s_tag
+					        >> tmp
+					        >> info.link
+					        >> info.s_dep_tag;
+				
+					switch (info.s_tag[0]) {
+						case 'n':
+							info.tag = NOUN;
+							break;
+						case 'v':
+						case 'm':
+							info.tag = VERB;
+							break;
+						case 'j':
+							info.tag = ADJECTIVE;
+							break;
+						case 'd':
+							info.tag = DETERMINER;
+							break;
+						case 'p':
+							info.tag = PRONOUN;
+							break;
+						case 'c':
+							info.tag = COORDINATING_CONJUNCTION;
+							break;
+						default:
+							info.tag = PUNCTUATION;
+							break;
+					}
+					info.dep_tag = dep_tag_from_str(info.s_dep_tag);
+					
+					synt_info.push_back(info);
+				}
+				infos.push_back(synt_info);
 			}
 			sem_out.close();
-			return synt_info;
+			return infos;
         }
-    private:
-        Language lang;
 };
 
 bool is_number(const std::string& s)
@@ -436,12 +430,13 @@ vector<SyntaxInfo> info;
 ofstream output, vocabulary;
 
 void
-check_word(int from, int to, Sentence *sentence) {
+check_word(int from, int to, Sentence *sentence, bool need_to_add_links) {
 	string morf_form_of_link_word = info[ to ].morphological_form_of_word;
 	int it;
 	if ((it = semantic_info.info.find(pair<string, DependTag>
 								(morf_form_of_link_word, info[from].dep_tag))) != -1) {
-		info[ info[from].link-1 ].links.push_back(from + 1);
+		if (need_to_add_links)
+			info[ info[from].link-1 ].links.push_back(from + 1);
 		//add to vocabluary
 		vocabulary << "============" << endl
 				   << "TITLE\t= " << info[from].morphological_form_of_word << endl
@@ -461,34 +456,36 @@ check_word(int from, int to, Sentence *sentence) {
 				vocabulary << " " << sf_i << "  " << (*word_sf_arr)[sf_i - 1] << endl;
 			}
 		}
-
-		vocabulary << "GF1\t= 1  " << semantic_info.info.get_gf(it) << endl;
-
-		for (unsigned int j = 0; j < semantic_info.info[it].size(); ++j) {
-			info[to].semantic.push_back(semantic_info.info[it][j]);
-			if (!j) vocabulary << "SF1\t=";
-			else vocabulary << "   \t ";
-			vocabulary << " " << (j + 1) << "  " << semantic_info.info[it][j] << endl;
-		}
-
-		if (find_in_v(cat, morf_form_of_link_word) != "")
-			vocabulary << "CAT0\t= 1  " << find_in_v(cat, morf_form_of_link_word) << endl;
-
+		
 		string suffics = "0";
 		if (info[from].tag == VERB) {
 			suffics = "";
 		}
 
-		if (find_in_v(word_gf, morf_form_of_link_word) != "")
-			vocabulary << "GF" << suffics << "\t=" << find_in_v(word_gf, morf_form_of_link_word) << endl;
+		vocabulary << "GF1\t= 1  " << semantic_info.info.get_gf(it) << endl;
+
 		if (find_v_in_v(word_sf, morf_form_of_link_word)) {
-			vocabulary << "SF" << suffics << "\t=";
+			vocabulary << "SF1\t=";
 			vector<string> *word_sf_arr = find_v_in_v(word_sf, morf_form_of_link_word);
 			for (unsigned int sf_i = 1; sf_i <= word_sf_arr->size(); ++sf_i) {
-				info[from].semantic.push_back((*word_sf_arr)[sf_i - 1]);
+				info[to].semantic.push_back((*word_sf_arr)[sf_i - 1]);
 				vocabulary << " " << sf_i << "  " << (*word_sf_arr)[sf_i - 1] << endl;
 			}
 		}
+
+		if (find_in_v(cat, morf_form_of_link_word) != "")
+			vocabulary << "CAT0\t= 1  " << find_in_v(cat, morf_form_of_link_word) << endl;
+
+		if (find_in_v(word_gf, morf_form_of_link_word) != "")
+			vocabulary << "GF" << suffics << "\t=" << find_in_v(word_gf, morf_form_of_link_word) << endl;
+		
+		for (unsigned int j = 0; j < semantic_info.info[it].size(); ++j) {
+			info[from].semantic.push_back(semantic_info.info[it][j]);
+			if (!j) vocabulary << "SF" << suffics << "\t=";
+			else vocabulary << "   \t ";
+			vocabulary << " " << (j + 1) << "  " << semantic_info.info[it][j] << endl;
+		}
+
 		while (isspace(sentence->text[0])) {
 			sentence->text.erase(sentence->text.begin());
 		}
@@ -523,31 +520,34 @@ main(int argc, char **argv)
 	Dependency::config();
 	semantic_info.load("tests/ru_ross.txt");
 	InputFile in_file("tests/input.txt");
-	Parser parser(RUS);
+	Parser parser;
 	output.open("tests/output.txt");
 	vocabulary.open("tests/vocabulary.txt");
 	Sentence *sentence;
-	
+
 	parser.init();
 	while (sentence = in_file.nextSentence()) {
 	    parser.add_sentence(sentence);
 	}
+
 	vector< vector<SyntaxInfo> > infos = parser.parse();
+	in_file.reopen("tests/input.txt");
 
 	int global_i = 1;
-	for (int sent_id=0; sent_id < infos.size(); ++sent_id) {
+	for (int sent_id=0; sent_id < infos.size()-1; ++sent_id) {
 		info = infos[sent_id];
+		sentence = in_file.nextSentence();
 	    for (unsigned int i = 0; i < info.size(); ++i) {
 			if (info[i].link == 0) continue;
-			check_word(i, info[i].link-1, sentence);
+			check_word(i, info[i].link-1, sentence, true);
 	    }
 	    for (unsigned int i = 0; i < info.size(); ++i) {
 			if (info[i].links.size() == 0) continue;
 			for (unsigned int j = 0; j < info[i].links.size(); ++j) {
-				check_word(i, info[i].links[j] - 1, sentence);
+				check_word(i, info[i].links[j] - 1, sentence, false);
 			}
 	    }
-	    for (unsigned int i = 0; i < info.size()-1; ++i) {
+	    for (unsigned int i = 0; i < info.size(); ++i) {
 			output << (i+1)
 					   << "\t"
 					   << info[i].word
